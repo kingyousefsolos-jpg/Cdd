@@ -1,0 +1,874 @@
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
+
+local LP = Players.LocalPlayer
+
+--// CONFIGURATION
+local Config = {
+    AllowedUsers = {
+        [1078716062] = true,
+        [10953507045] = true,
+        [11504474590] = true,
+        [4617157523] = true,
+        [10953473957] = true,
+        [11205513973] = true,
+        [6034629082] = true,
+        [2451870701] = true,
+        [11326736336] = true,
+        [5314071575] = true,
+        [3665792254] = true,
+        [3724035742] = true,
+        [2815359281] = true,
+        [5523755604] = true,
+        [829774802] = true,
+        [5318881610] = true,
+        [2540763129] = true,
+        [2596625196] = true,
+        [1070864126] = true,
+    },
+}
+
+--// GUI WHITELIST
+local FriendWhitelist = {}
+
+local function NormalizeName(name)
+    return string.lower(string.gsub(name or "", "^%s*(.-)%s*$", "%1"))
+end
+
+local function IsFriend(player)
+    local username = NormalizeName(player.Name)
+    local displayName = NormalizeName(player.DisplayName)
+
+    return FriendWhitelist[username] == true
+        or FriendWhitelist[displayName] == true
+end
+
+--// STARTUP
+local StartupGui = Instance.new("ScreenGui")
+StartupGui.Name = "PremiumStartup"
+StartupGui.IgnoreGuiInset = true
+StartupGui.ResetOnSpawn = false
+StartupGui.Parent = LP:WaitForChild("PlayerGui")
+
+local StartupFrame = Instance.new("Frame")
+StartupFrame.Parent = StartupGui
+StartupFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+StartupFrame.Position = UDim2.fromScale(0.5, 0.5)
+StartupFrame.Size = UDim2.fromOffset(380, 130)
+StartupFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+StartupFrame.BorderSizePixel = 0
+
+Instance.new("UICorner", StartupFrame).CornerRadius = UDim.new(0, 16)
+
+local StartupStroke = Instance.new("UIStroke", StartupFrame)
+StartupStroke.Thickness = 2
+StartupStroke.Color = Color3.fromRGB(255, 0, 0)
+
+local StartupText = Instance.new("TextLabel")
+StartupText.Parent = StartupFrame
+StartupText.Size = UDim2.new(1, -30, 1, -30)
+StartupText.Position = UDim2.fromOffset(15, 15)
+StartupText.BackgroundTransparency = 1
+StartupText.Text = "NOCTURNAL\nThanks for Purchasing!"
+StartupText.TextColor3 = Color3.fromRGB(245, 245, 250)
+StartupText.Font = Enum.Font.GothamBold
+StartupText.TextSize = 21
+StartupText.TextWrapped = true
+
+task.wait(2)
+StartupGui:Destroy()
+
+--// ACCESS CHECK
+if not Config.AllowedUsers[LP.UserId] then
+    local G = Instance.new("ScreenGui")
+    G.Name = "PremiumAccessDenied"
+    G.IgnoreGuiInset = true
+    G.ResetOnSpawn = false
+    G.Parent = LP:WaitForChild("PlayerGui")
+
+    local F = Instance.new("Frame", G)
+    F.AnchorPoint = Vector2.new(0.5, 0.5)
+    F.Position = UDim2.fromScale(0.5, 0.5)
+    F.Size = UDim2.fromOffset(410, 190)
+    F.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    F.BorderSizePixel = 0
+
+    Instance.new("UICorner", F).CornerRadius = UDim.new(0, 16)
+
+    local S = Instance.new("UIStroke", F)
+    S.Color = Color3.fromRGB(255, 60, 60)
+    S.Thickness = 2
+
+    local T = Instance.new("TextLabel", F)
+    T.Size = UDim2.new(1, -30, 1, -30)
+    T.Position = UDim2.fromOffset(15, 15)
+    T.BackgroundTransparency = 1
+    T.Text = "PREMIUM ACCESS REQUIRED"
+    T.TextColor3 = Color3.fromRGB(245, 245, 250)
+    T.Font = Enum.Font.GothamBold
+    T.TextSize = 20
+    T.TextWrapped = true
+
+    return
+end
+
+local Remote = RS:WaitForChild("events"):WaitForChild("remote")
+
+--// SETTINGS
+local Enabled = false
+local Blocking = false
+local HitboxESP = false
+local Mode = "Normal"
+
+local MaxRange = 50
+local BlockTime = 0.55
+local StrongRange = 15
+local StrongDelay = 0.20
+
+local Modes = {
+    Slow = {Range = 0.65, Scan = 0.08, ExtraDelay = 0.12},
+    Normal = {Range = 1, Scan = 0.03, ExtraDelay = 0},
+    Speed = {Range = 1.25, Scan = 0.015, ExtraDelay = -0.05},
+}
+
+local Moves = {
+    ["Void Style"] = {15, 0.2},
+    ["Moon Dragon Ringtail"] = {50, 0.5},
+    ["Rapid Conquest"] = {50, 0},
+    ["Raging Sun"] = {12, 0},
+    ["Destruction Style"] = {20, 0.2},
+    ["Rampant Arc Rampage"] = {10, 0},
+    ["Sonic Scream"] = {10, 0},
+    ["Crazed Cry of Thunder"] = {40, 0.5},
+    ["Body Spike"] = {20, 0.2},
+    ["Ground Spike"] = {50, 0.2},
+    ["Rat's ClawOG"] = {10, 0},
+    ["Bite And InfectOG"] = {30, 0.2},
+    ["Distant Mist"] = {30, 0.3},
+    ["Compound Eye Hexagon"] = {15, 0},
+    ["Roar"] = {30, 0},
+    ["Explosive Slash"] = {30, 0},
+    ["Unknowing Fire"] = {50, 0},
+    ["Clean Storm Wind Tree"] = {10, 0},
+    ["Dust Whirlwind Cutter"] = {50, 0},
+    ["Peonies of Futility"] = {15, 0},
+    ["Whirling Peach"] = {15, 0.2},
+    ["Water Surface Slash"] = {15, 0.1},
+    ["Demon Blade"] = {10, 0.6},
+    ["Leap Kick"] = {30, 0.8},
+    ["Brutal Cleave"] = {30, 0.3},
+    ["Thunderclap Flash"] = {50, 0},
+    ["Flaming Thunder God"] = {50, 0},
+    ["Waltz"] = {30, 0.2},
+    ["Freezing Clouds"] = {15, 0},
+    ["Coil Choke"] = {12, 0},
+    ["Winding Serpent Slash"] = {12, 0.1},
+}
+
+local MoveState = {}
+local Initialized = {}
+
+local function Root(player)
+    return player.Character
+        and player.Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function GetCDS(player)
+    return player:FindFirstChild("cds")
+        or (player.Character and player.Character:FindFirstChild("cds"))
+end
+
+local function InRange(player, range)
+    local me = Root(LP)
+    local target = Root(player)
+
+    if not me or not target then
+        return false
+    end
+
+    local mode = Modes[Mode]
+    local effectiveRange = math.min(
+        range * mode.Range,
+        MaxRange * mode.Range
+    )
+
+    return (target.Position - me.Position).Magnitude <= effectiveRange
+end
+
+local function HasCooldown(cds, move)
+    return cds and cds:FindFirstChild(move) ~= nil
+end
+
+local function Block()
+    if Blocking or not Enabled then
+        return
+    end
+
+    Blocking = true
+
+    pcall(function()
+        Remote:FireServer("blockstart")
+    end)
+
+    task.delay(BlockTime, function()
+        pcall(function()
+            Remote:FireServer("blockend")
+        end)
+
+        Blocking = false
+    end)
+end
+
+local function SeedPlayer(player, cds)
+    Initialized[player] = true
+    MoveState[player] = {}
+
+    for move in pairs(Moves) do
+        MoveState[player][move] = HasCooldown(cds, move)
+    end
+end
+
+local function CheckMoves(player)
+    if IsFriend(player) then
+        return
+    end
+
+    local cds = GetCDS(player)
+
+    if not Initialized[player] then
+        SeedPlayer(player, cds)
+        return
+    end
+
+    MoveState[player] = MoveState[player] or {}
+
+    for move, settings in pairs(Moves) do
+        local active = HasCooldown(cds, move)
+        local previous = MoveState[player][move]
+
+        if active and not previous then
+            MoveState[player][move] = true
+
+            local range = settings[1]
+            local delayTime = math.max(
+                0,
+                settings[2] + Modes[Mode].ExtraDelay
+            )
+
+            if InRange(player, range) then
+                task.delay(delayTime, function()
+                    if not Enabled or IsFriend(player) then
+                        return
+                    end
+
+                    local currentCDS = GetCDS(player)
+
+                    if currentCDS
+                        and HasCooldown(currentCDS, move)
+                        and InRange(player, range) then
+                        Block()
+                    end
+                end)
+            end
+
+        elseif not active and previous then
+            MoveState[player][move] = false
+        end
+    end
+end
+
+Players.PlayerRemoving:Connect(function(player)
+    MoveState[player] = nil
+    Initialized[player] = nil
+end)
+
+Players.PlayerAdded:Connect(function(player)
+    player.ChildAdded:Connect(function(child)
+        if child.Name == "cds" then
+            SeedPlayer(player, child)
+        end
+    end)
+end)
+
+--// ESP
+local ESPObjects = {}
+
+local function RemoveESP(player)
+    local data = ESPObjects[player]
+
+    if data and data.Highlight then
+        data.Highlight:Destroy()
+    end
+
+    ESPObjects[player] = nil
+end
+
+local function UpdateESP(player)
+    if player == LP or IsFriend(player) then
+        RemoveESP(player)
+        return
+    end
+
+    if not HitboxESP then
+        RemoveESP(player)
+        return
+    end
+
+    local character = player.Character
+
+    if not character then
+        RemoveESP(player)
+        return
+    end
+
+    local highlight = ESPObjects[player]
+        and ESPObjects[player].Highlight
+
+    if not highlight or highlight.Parent ~= character then
+        RemoveESP(player)
+
+        highlight = Instance.new("Highlight")
+        highlight.Name = "NocturnalHitboxESP"
+        highlight.Adornee = character
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillTransparency = 0.75
+        highlight.OutlineTransparency = 0
+        highlight.Parent = character
+
+        ESPObjects[player] = {
+            Highlight = highlight
+        }
+    end
+end
+
+local function UpdateAllESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LP then
+            UpdateESP(player)
+        end
+    end
+end
+
+Players.PlayerRemoving:Connect(RemoveESP)
+
+--// DETECTION LOOP
+task.spawn(function()
+    while true do
+        task.wait(Modes[Mode].Scan)
+
+        if not Enabled or not Root(LP) then
+            continue
+        end
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LP and not IsFriend(player) then
+
+                local targetRoot = Root(player)
+                local character = player.Character
+                local windup = character
+                    and character:FindFirstChild(
+                        "StrongAttackWindup",
+                        true
+                    )
+
+                if targetRoot
+                    and windup
+                    and InRange(player, StrongRange) then
+
+                    local delayTime = math.max(
+                        0.05,
+                        StrongDelay + Modes[Mode].ExtraDelay
+                    )
+
+                    task.delay(delayTime, function()
+                        local target = Root(player)
+                        local me = Root(LP)
+
+                        if Enabled
+                            and not IsFriend(player)
+                            and target
+                            and me
+                            and player.Character
+                            and player.Character:FindFirstChild(
+                                "StrongAttackWindup",
+                                true
+                            )
+                            and InRange(player, StrongRange) then
+                            Block()
+                        end
+                    end)
+                end
+
+                CheckMoves(player)
+            end
+        end
+    end
+end)
+
+--==================================================
+--// NEW UI
+--==================================================
+
+local GUI = Instance.new("ScreenGui")
+GUI.Name = "NocturnalPremiumAB"
+GUI.ResetOnSpawn = false
+GUI.IgnoreGuiInset = true
+GUI.Parent = LP:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame")
+Main.Parent = GUI
+Main.Size = UDim2.fromOffset(390, 430)
+Main.Position = UDim2.new(0.5, -195, 0.5, -215)
+Main.BackgroundColor3 = Color3.fromRGB(9, 9, 14)
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
+
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 18)
+
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Thickness = 1.5
+MainStroke.Color = Color3.fromRGB(80, 80, 105)
+
+-- Animated accent
+task.spawn(function()
+    local hue = 0
+
+    while Main.Parent do
+        hue = (hue + 0.003) % 1
+        MainStroke.Color = Color3.fromHSV(hue, 0.85, 1)
+        task.wait(0.03)
+    end
+end)
+
+--// HEADER
+local Header = Instance.new("Frame")
+Header.Parent = Main
+Header.Size = UDim2.new(1, 0, 0, 68)
+Header.BackgroundColor3 = Color3.fromRGB(15, 15, 23)
+Header.BorderSizePixel = 0
+
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 18)
+
+local HeaderBottom = Instance.new("Frame")
+HeaderBottom.Parent = Header
+HeaderBottom.Size = UDim2.new(1, 0, 0, 20)
+HeaderBottom.Position = UDim2.new(0, 0, 1, -20)
+HeaderBottom.BackgroundColor3 = Header.BackgroundColor3
+HeaderBottom.BorderSizePixel = 0
+
+local Title = Instance.new("TextLabel")
+Title.Parent = Header
+Title.Size = UDim2.new(1, -90, 0, 25)
+Title.Position = UDim2.fromOffset(20, 11)
+Title.BackgroundTransparency = 1
+Title.Text = "NOCTURNAL"
+Title.TextColor3 = Color3.fromRGB(245, 245, 250)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 17
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local Subtitle = Instance.new("TextLabel")
+Subtitle.Parent = Header
+Subtitle.Size = UDim2.new(1, -90, 0, 16)
+Subtitle.Position = UDim2.fromOffset(20, 37)
+Subtitle.BackgroundTransparency = 1
+Subtitle.Text = "PREMIUM COMBAT SYSTEM"
+Subtitle.TextColor3 = Color3.fromRGB(105, 105, 125)
+Subtitle.Font = Enum.Font.GothamMedium
+Subtitle.TextSize = 8
+Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Parent = Header
+MinimizeButton.Size = UDim2.fromOffset(36, 36)
+MinimizeButton.Position = UDim2.new(1, -50, 0, 16)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(27, 27, 39)
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.AutoButtonColor = false
+MinimizeButton.Text = "−"
+MinimizeButton.TextColor3 = Color3.fromRGB(235, 235, 240)
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.TextSize = 18
+
+Instance.new("UICorner", MinimizeButton).CornerRadius = UDim.new(0, 10)
+
+--// STATUS
+local Status = Instance.new("TextLabel")
+Status.Parent = Main
+Status.Size = UDim2.new(1, -40, 0, 25)
+Status.Position = UDim2.fromOffset(20, 80)
+Status.BackgroundTransparency = 1
+Status.Text = "●  SYSTEM OFFLINE"
+Status.TextColor3 = Color3.fromRGB(125, 125, 140)
+Status.Font = Enum.Font.GothamBold
+Status.TextSize = 10
+Status.TextXAlignment = Enum.TextXAlignment.Left
+
+--// AUTO BLOCK
+local Toggle = Instance.new("TextButton")
+Toggle.Parent = Main
+Toggle.Size = UDim2.new(1, -40, 0, 48)
+Toggle.Position = UDim2.fromOffset(20, 112)
+Toggle.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+Toggle.BorderSizePixel = 0
+Toggle.AutoButtonColor = false
+Toggle.Text = "AUTO BLOCK                              OFF"
+Toggle.TextColor3 = Color3.fromRGB(230, 230, 238)
+Toggle.Font = Enum.Font.GothamBold
+Toggle.TextSize = 10
+
+Instance.new("UICorner", Toggle).CornerRadius = UDim.new(0, 11)
+
+local ToggleStroke = Instance.new("UIStroke", Toggle)
+ToggleStroke.Color = Color3.fromRGB(55, 55, 72)
+ToggleStroke.Thickness = 1
+
+--// ESP
+local ESPButton = Instance.new("TextButton")
+ESPButton.Parent = Main
+ESPButton.Size = UDim2.new(1, -40, 0, 43)
+ESPButton.Position = UDim2.fromOffset(20, 169)
+ESPButton.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+ESPButton.BorderSizePixel = 0
+ESPButton.AutoButtonColor = false
+ESPButton.Text = "HITBOX ESP                              OFF"
+ESPButton.TextColor3 = Color3.fromRGB(220, 220, 230)
+ESPButton.Font = Enum.Font.GothamBold
+ESPButton.TextSize = 9
+
+Instance.new("UICorner", ESPButton).CornerRadius = UDim.new(0, 10)
+
+local ESPStroke = Instance.new("UIStroke", ESPButton)
+ESPStroke.Color = Color3.fromRGB(55, 55, 72)
+ESPStroke.Thickness = 1
+
+--// MODE
+local ModeLabel = Instance.new("TextLabel")
+ModeLabel.Parent = Main
+ModeLabel.Size = UDim2.new(1, -40, 0, 18)
+ModeLabel.Position = UDim2.fromOffset(20, 225)
+ModeLabel.BackgroundTransparency = 1
+ModeLabel.Text = "DETECTION MODE"
+ModeLabel.TextColor3 = Color3.fromRGB(100, 100, 120)
+ModeLabel.Font = Enum.Font.GothamBold
+ModeLabel.TextSize = 8
+ModeLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local ModeButton = Instance.new("TextButton")
+ModeButton.Parent = Main
+ModeButton.Size = UDim2.new(1, -40, 0, 38)
+ModeButton.Position = UDim2.fromOffset(20, 247)
+ModeButton.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+ModeButton.BorderSizePixel = 0
+ModeButton.AutoButtonColor = false
+ModeButton.Text = "NORMAL"
+ModeButton.TextColor3 = Color3.fromRGB(235, 235, 240)
+ModeButton.Font = Enum.Font.GothamBold
+ModeButton.TextSize = 9
+
+Instance.new("UICorner", ModeButton).CornerRadius = UDim.new(0, 9)
+
+--==================================================
+--// FRIEND WHITELIST
+--==================================================
+
+local WhitelistLabel = Instance.new("TextLabel")
+WhitelistLabel.Parent = Main
+WhitelistLabel.Size = UDim2.new(1, -40, 0, 18)
+WhitelistLabel.Position = UDim2.fromOffset(20, 300)
+WhitelistLabel.BackgroundTransparency = 1
+WhitelistLabel.Text = "FRIEND WHITELIST"
+WhitelistLabel.TextColor3 = Color3.fromRGB(100, 100, 120)
+WhitelistLabel.Font = Enum.Font.GothamBold
+WhitelistLabel.TextSize = 8
+WhitelistLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local NameBox = Instance.new("TextBox")
+NameBox.Parent = Main
+NameBox.Size = UDim2.new(1, -105, 0, 36)
+NameBox.Position = UDim2.fromOffset(20, 322)
+NameBox.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+NameBox.BorderSizePixel = 0
+NameBox.ClearTextOnFocus = false
+NameBox.PlaceholderText = "Enter username..."
+NameBox.PlaceholderColor3 = Color3.fromRGB(85, 85, 105)
+NameBox.Text = ""
+NameBox.TextColor3 = Color3.fromRGB(235, 235, 240)
+NameBox.Font = Enum.Font.Gotham
+NameBox.TextSize = 9
+NameBox.TextXAlignment = Enum.TextXAlignment.Left
+
+Instance.new("UICorner", NameBox).CornerRadius = UDim.new(0, 9)
+
+local NamePadding = Instance.new("UIPadding")
+NamePadding.Parent = NameBox
+NamePadding.PaddingLeft = UDim.new(0, 12)
+NamePadding.PaddingRight = UDim.new(0, 8)
+
+local AddButton = Instance.new("TextButton")
+AddButton.Parent = Main
+AddButton.Size = UDim2.fromOffset(72, 36)
+AddButton.Position = UDim2.new(1, -92, 0, 322)
+AddButton.BackgroundColor3 = Color3.fromRGB(32, 55, 42)
+AddButton.BorderSizePixel = 0
+AddButton.AutoButtonColor = false
+AddButton.Text = "ADD"
+AddButton.TextColor3 = Color3.fromRGB(225, 245, 230)
+AddButton.Font = Enum.Font.GothamBold
+AddButton.TextSize = 9
+
+Instance.new("UICorner", AddButton).CornerRadius = UDim.new(0, 9)
+
+--// WHITELIST STATUS
+local WhitelistStatus = Instance.new("TextLabel")
+WhitelistStatus.Parent = Main
+WhitelistStatus.Size = UDim2.new(1, -40, 0, 20)
+WhitelistStatus.Position = UDim2.fromOffset(20, 365)
+WhitelistStatus.BackgroundTransparency = 1
+WhitelistStatus.Text = "No players whitelisted"
+WhitelistStatus.TextColor3 = Color3.fromRGB(85, 85, 100)
+WhitelistStatus.Font = Enum.Font.Gotham
+WhitelistStatus.TextSize = 8
+WhitelistStatus.TextXAlignment = Enum.TextXAlignment.Left
+
+--// FOOTER
+local Info = Instance.new("TextLabel")
+Info.Parent = Main
+Info.Size = UDim2.new(1, -40, 0, 18)
+Info.Position = UDim2.fromOffset(20, 395)
+Info.BackgroundTransparency = 1
+Info.Text = "31 MOVES   •   STRONG 15 STUDS   •   PREMIUM"
+Info.TextColor3 = Color3.fromRGB(65, 65, 80)
+Info.Font = Enum.Font.Gotham
+Info.TextSize = 7
+Info.TextXAlignment = Enum.TextXAlignment.Left
+
+--==================================================
+--// WHITELIST FUNCTIONS
+--==================================================
+
+local function UpdateWhitelistText()
+    local names = {}
+
+    for name in pairs(FriendWhitelist) do
+        table.insert(names, name)
+    end
+
+    table.sort(names)
+
+    if #names == 0 then
+        WhitelistStatus.Text = "No players whitelisted"
+        WhitelistStatus.TextColor3 = Color3.fromRGB(85, 85, 100)
+    else
+        WhitelistStatus.Text = "IGNORED: " .. table.concat(names, ", ")
+        WhitelistStatus.TextColor3 = Color3.fromRGB(110, 190, 135)
+    end
+
+    UpdateAllESP()
+end
+
+local function AddWhitelist()
+    local name = NormalizeName(NameBox.Text)
+
+    if name == "" then
+        WhitelistStatus.Text = "Enter a username first"
+        WhitelistStatus.TextColor3 = Color3.fromRGB(210, 100, 100)
+        return
+    end
+
+    FriendWhitelist[name] = true
+
+    NameBox.Text = ""
+    UpdateWhitelistText()
+end
+
+AddButton.MouseButton1Click:Connect(AddWhitelist)
+
+NameBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        AddWhitelist()
+    end
+end)
+
+-- Double-click status to clear whitelist
+WhitelistStatus.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        for name in pairs(FriendWhitelist) do
+            FriendWhitelist[name] = nil
+        end
+
+        UpdateWhitelistText()
+        WhitelistStatus.Text = "Whitelist cleared"
+        WhitelistStatus.TextColor3 = Color3.fromRGB(210, 180, 100)
+
+        task.delay(1.5, function()
+            UpdateWhitelistText()
+        end)
+    end
+end)
+
+--==================================================
+--// BUTTONS
+--==================================================
+
+Toggle.MouseButton1Click:Connect(function()
+    Enabled = not Enabled
+
+    if Enabled then
+        Toggle.Text = "AUTO BLOCK                              ON"
+        Toggle.BackgroundColor3 = Color3.fromRGB(32, 55, 42)
+        Status.Text = "●  SYSTEM ACTIVE  /  " .. Mode:upper()
+        Status.TextColor3 = Color3.fromRGB(110, 205, 135)
+    else
+        Toggle.Text = "AUTO BLOCK                              OFF"
+        Toggle.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+        Status.Text = "●  SYSTEM OFFLINE"
+        Status.TextColor3 = Color3.fromRGB(125, 125, 140)
+    end
+end)
+
+ESPButton.MouseButton1Click:Connect(function()
+    HitboxESP = not HitboxESP
+
+    if HitboxESP then
+        ESPButton.Text = "HITBOX ESP                              ON"
+        ESPButton.BackgroundColor3 = Color3.fromRGB(32, 55, 42)
+        UpdateAllESP()
+    else
+        ESPButton.Text = "HITBOX ESP                              OFF"
+        ESPButton.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+
+        for player in pairs(ESPObjects) do
+            RemoveESP(player)
+        end
+    end
+end)
+
+local ModeOrder = {
+    "Slow",
+    "Normal",
+    "Speed"
+}
+
+ModeButton.MouseButton1Click:Connect(function()
+    local index = table.find(ModeOrder, Mode) or 2
+
+    Mode = ModeOrder[index % #ModeOrder + 1]
+
+    ModeButton.Text = Mode:upper()
+
+    if Enabled then
+        Status.Text = "●  SYSTEM ACTIVE  /  " .. Mode:upper()
+    end
+end)
+
+--==================================================
+--// MINIMIZE
+--==================================================
+
+local Minimized = false
+
+local function SetMinimized(state)
+    Minimized = state
+
+    if Minimized then
+        Main.Size = UDim2.fromOffset(250, 68)
+
+        MinimizeButton.Text = "+"
+
+        Status.Visible = false
+        Toggle.Visible = false
+        ESPButton.Visible = false
+        ModeLabel.Visible = false
+        ModeButton.Visible = false
+
+        WhitelistLabel.Visible = false
+        NameBox.Visible = false
+        AddButton.Visible = false
+        WhitelistStatus.Visible = false
+
+        Info.Visible = false
+    else
+        Main.Size = UDim2.fromOffset(390, 430)
+
+        MinimizeButton.Text = "−"
+
+        Status.Visible = true
+        Toggle.Visible = true
+        ESPButton.Visible = true
+        ModeLabel.Visible = true
+        ModeButton.Visible = true
+
+        WhitelistLabel.Visible = true
+        NameBox.Visible = true
+        AddButton.Visible = true
+        WhitelistStatus.Visible = true
+
+        Info.Visible = true
+    end
+end
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    SetMinimized(not Minimized)
+end)
+
+--==================================================
+--// DRAGGING
+--==================================================
+
+local dragging = false
+local dragStart
+local startPos
+
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging
+        and (
+            input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        ) then
+
+        local delta = input.Position - dragStart
+
+        Main.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = false
+    end
+end)
+
+--==================================================
+--// ESP UPDATE
+--==================================================
+
+task.spawn(function()
+    while GUI.Parent do
+        if HitboxESP then
+            UpdateAllESP()
+        end
+
+        task.wait(0.25)
+    end
+end)
+
+UpdateWhitelistText()
